@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { randomUUID } from 'crypto';
 import { retryApiCall, sanitizeErrorMessage } from './error-handling';
 import { getMCPToolConfig, MCPTool } from './zapier-mcp';
 
@@ -191,7 +192,7 @@ export function extractCalendarAction(response: any): any {
                 mcpCall.name?.includes('update') ? 'edit' : 
                 mcpCall.name?.includes('delete') ? 'delete' : 'action',
           event: eventDetails,
-          confirmationId: crypto.randomUUID(),
+          confirmationId: randomUUID(),
           rawToolCall: mcpCall
         };
       } catch (error) {

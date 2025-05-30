@@ -1,3 +1,16 @@
+// Polyfill for AbortSignal.timeout (Node 20+ feature) to support older Node versions
+const createTimeoutSignal = (timeout: number): AbortSignal => {
+  if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+    // Use native implementation if available (Node 20+)
+    return AbortSignal.timeout(timeout);
+  }
+  
+  // Polyfill for older Node versions
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeout);
+  return controller.signal;
+};
+
 // Retry logic for API calls
 export const retryApiCall = async <T>(
   fn: () => Promise<T>, 
@@ -79,7 +92,7 @@ export const checkServiceHealth = async (url: string): Promise<boolean> => {
       headers: {
         'Content-Type': 'application/json',
       },
-      signal: AbortSignal.timeout(5000), // 5 second timeout
+      signal: createTimeoutSignal(5000), // 5 second timeout
     });
     return response.ok;
   } catch {
