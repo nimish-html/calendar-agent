@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { OpenAIClient, detectCalendarModification, extractMessageContent, extractCalendarAction } from '@/lib/openai';
 import { handleRateLimit, sanitizeErrorMessage } from '@/lib/error-handling';
 import { getMCPToolConfig } from '@/lib/zapier-mcp';
+import { randomUUID } from 'crypto';
+
+// Simple in-memory store for pending calendar actions
+// In a production app, you might use a database or a more robust caching solution
+const pendingActions = new Map<string, any>();
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, previousResponseId } = await request.json();
+    const { message, previousResponseId, confirmationId, confirmed, currentDate, userTimezone } = await request.json();
     
     if (!message?.trim()) {
       return NextResponse.json(
@@ -21,13 +26,35 @@ export async function POST(request: NextRequest) {
       console.warn('Zapier MCP configuration is missing. Calendar tools will be unavailable.');
     }
 
+    if (confirmationId && confirmed && pendingActions.has(confirmationId)) {
+      const actionToExecute = pendingActions.get(confirmationId);
+      pendingActions.delete(confirmationId); // Clean up after retrieving
+
+      // Here you would typically call the Zapier MCP tool or your calendar API
+      // For now, we'll simulate success and return a confirmation message.
+      // This part needs to be implemented to actually execute the calendar action.
+      console.log('Executing action:', actionToExecute);
+      
+      // Placeholder for actual execution logic
+      // Example: await executeCalendarAction(actionToExecute.rawToolCall);
+
+      return NextResponse.json({
+        id: previousResponseId || randomUUID(),
+        message: `Okay, I've scheduled "${actionToExecute.event.title}".`,
+        requiresConfirmation: false,
+        calendarAction: null // Action is now completed
+      });
+    }
+
     const openai = new OpenAIClient();
     const response = await openai.createResponse({
       model: "gpt-4o",
       input: message,
       previous_response_id: previousResponseId,
-      // The OpenAIClient will internally use getMCPToolConfig
       instructions: `You are a helpful Google Calendar assistant. 
+        User's current date is: ${currentDate}
+        User's current timezone is: ${userTimezone}
+
         - For reading calendar information (checking availability, viewing events, analyzing schedules), respond directly with the information.
         - For calendar modifications (create, edit, delete, reschedule events), always indicate that confirmation is required by using phrases like "I can help you create this event" or "I can schedule this meeting for you" and include the event details.
         - Provide clear, concise responses about calendar management and productivity.
@@ -48,6 +75,11 @@ export async function POST(request: NextRequest) {
     const requiresConfirmation = detectCalendarModification(response);
     const messageContent = extractMessageContent(response);
     const calendarAction = requiresConfirmation ? extractCalendarAction(response) : undefined;
+    
+    if (requiresConfirmation && calendarAction && calendarAction.confirmationId) {
+      pendingActions.set(calendarAction.confirmationId, calendarAction);
+      console.log('Stored pending action:', calendarAction.confirmationId, calendarAction);
+    }
     
     return NextResponse.json({
       id: response.id,
@@ -86,6 +118,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const message = searchParams.get('message');
   const previousResponseId = searchParams.get('previousResponseId');
+  const currentDate = searchParams.get('currentDate');
+  const userTimezone = searchParams.get('userTimezone');
   
   if (!message?.trim()) {
     return NextResponse.json(
@@ -106,6 +140,9 @@ export async function GET(request: NextRequest) {
       input: message,
       previous_response_id: previousResponseId || undefined,
       instructions: `You are a helpful Google Calendar assistant. 
+        User's current date is: ${currentDate || new Date().toISOString()}
+        User's current timezone is: ${userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+
         - For reading calendar information, respond directly with the information.
         - For calendar modifications, always indicate that confirmation is required.
         - Provide clear, concise responses about calendar management and productivity.

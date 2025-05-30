@@ -6,19 +6,25 @@ import { Textarea } from '@/components/ui/textarea';
 import { Send, Paperclip, Mic } from 'lucide-react';
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, confirmed?: boolean, confirmationId?: string) => void;
   disabled?: boolean;
+  pendingConfirmationId?: string | null;
 }
 
-export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
+export function ChatInput({ onSendMessage, disabled = false, pendingConfirmationId = null }: ChatInputProps) {
   const [message, setMessage] = useState('');
 
   const handleSend = () => {
     const trimmedMessage = message.trim();
-    console.log('handleSend called:', { trimmedMessage, disabled });
+    console.log('handleSend called:', { trimmedMessage, disabled, pendingConfirmationId });
     if (trimmedMessage && !disabled) {
-      console.log('Sending message:', trimmedMessage);
-      onSendMessage(trimmedMessage);
+      if (pendingConfirmationId && (trimmedMessage.toLowerCase() === 'yes' || trimmedMessage.toLowerCase() === 'y')) {
+        console.log('Sending confirmation:', { trimmedMessage, pendingConfirmationId });
+        onSendMessage(trimmedMessage, true, pendingConfirmationId);
+      } else {
+        console.log('Sending regular message:', trimmedMessage);
+        onSendMessage(trimmedMessage);
+      }
       setMessage('');
     } else {
       console.log('Message not sent:', { isEmpty: !trimmedMessage, disabled });

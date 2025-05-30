@@ -1,5 +1,7 @@
 // Zapier MCP Integration for Google Calendar Operations
 
+import { validateCalendarAction as validateCalendarActionFromErrorHandling } from './error-handling';
+
 export interface MCPTool {
   type: 'mcp';
   server_label: string;
@@ -39,6 +41,41 @@ export function getMCPToolConfig(): MCPTool | undefined {
   };
 }
 
+// Re-export validateCalendarAction from error-handling for compatibility
+export const validateCalendarAction = validateCalendarActionFromErrorHandling;
+
+// Placeholder zapierMCP object for backward compatibility
+export const zapierMCP = {
+  async executeCalendarAction(calendarAction: any) {
+    // Placeholder implementation - should be replaced with actual MCP call
+    console.warn('zapierMCP.executeCalendarAction called - this is a placeholder implementation');
+    throw new Error('zapierMCP.executeCalendarAction is not implemented - calendar actions are now handled through OpenAI Responses API');
+  },
+
+  async checkHealth(): Promise<boolean> {
+    // Placeholder implementation - should be replaced with actual health check
+    console.warn('zapierMCP.checkHealth called - this is a placeholder implementation');
+    const mcpUrl = process.env.ZAPIER_MCP_URL;
+    if (!mcpUrl) {
+      return false;
+    }
+    
+    try {
+      // Basic connectivity check
+      const response = await fetch(`${mcpUrl}/health`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${process.env.ZAPIER_MCP_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+};
+
 // Removed ZapierMCPClient class and its methods (executeCalendarAction, readCalendarData, checkHealth, etc.)
-// Removed validateCalendarAction as it's not currently used in the primary chat flow.
 // The OpenAI Responses API will directly handle interactions with the MCP server. 

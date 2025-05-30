@@ -60,8 +60,8 @@ export function ChatContainer() {
   const [pendingConfirmation, setPendingConfirmation] = useState<CalendarAction | null>(null);
   const [conversationId] = useState(() => crypto.randomUUID());
 
-  const sendMessage = async (content: string) => {
-    console.log('sendMessage called with:', content);
+  const sendMessage = async (content: string, confirmed?: boolean, confirmationId?: string) => {
+    console.log('sendMessage called with:', { content, confirmed, confirmationId });
     setIsLoading(true);
     
     // Add user message
@@ -76,13 +76,20 @@ export function ChatContainer() {
     console.log('User message added, calling API...');
 
     try {
+      const currentDate = new Date().toISOString();
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: content,
           conversationId,
-          previousResponseId: messages[messages.length - 1]?.responseId,
+          previousResponseId: messages.length > 0 ? messages[messages.length - 1].responseId : undefined,
+          confirmed: confirmed,
+          confirmationId: confirmationId,
+          currentDate: currentDate,
+          userTimezone: userTimezone
         }),
       });
 
@@ -187,7 +194,11 @@ export function ChatContainer() {
   return (
     <div className="h-full flex flex-col">
       <MessageList messages={messages} isLoading={isLoading} />
-      <ChatInput onSendMessage={sendMessage} disabled={isLoading} />
+      <ChatInput 
+        onSendMessage={sendMessage} 
+        disabled={isLoading || !!pendingConfirmation}
+        pendingConfirmationId={pendingConfirmation?.confirmationId}
+      />
       
       {pendingConfirmation && (
         <MockConfirmationModal
